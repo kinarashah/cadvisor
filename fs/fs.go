@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
 // +build linux
 
 // Provides Filesystem Stats
@@ -93,13 +94,16 @@ type RealFsInfo struct {
 }
 
 func NewFsInfo(context Context) (FsInfo, error) {
+	fmt.Println("kinara: entered NewFsInfo!")
 	mounts, err := mount.ParseMountInfo("/proc/self/mountinfo")
 	if err != nil {
+		fmt.Println("kinara: err", err)
 		return nil, err
 	}
 
 	fsUUIDToDeviceName, err := getFsUUIDToDeviceNameMap()
 	if err != nil {
+		fmt.Println("kinara: getFsUUIDToDeviceNameMap err", err)
 		// UUID is not always available across different OS distributions.
 		// Do not fail if there is an error.
 		klog.Warningf("Failed to get disk UUID mapping, getting disk info by uuid will not work: %v", err)
@@ -273,14 +277,19 @@ func (i *RealFsInfo) addSystemRootLabel(mounts []mount.MountInfo) {
 
 // addDockerImagesLabel attempts to determine which device contains the mount for docker images.
 func (i *RealFsInfo) addDockerImagesLabel(context Context, mounts []mount.MountInfo) {
+	fmt.Println("kinara: enter addDockerImagesLabel mounts: ", mounts)
 	dockerDev, dockerPartition, err := i.getDockerDeviceMapperInfo(context.Docker)
 	if err != nil {
-		klog.Warningf("Could not get Docker devicemapper device: %v", err)
+		fmt.Println("kinara: could not get Docker devicemapper device: ", err)
 	}
+	fmt.Println("kinara: dockerDeviceMapperInfo dockerDev, dockerPartition", dockerDev, dockerPartition)
 	if len(dockerDev) > 0 && dockerPartition != nil {
 		i.partitions[dockerDev] = *dockerPartition
+		fmt.Println("kimara: ENTERED LABELS TO LABELS", dockerDev)
 		i.labels[LabelDockerImages] = dockerDev
 	} else {
+		fmt.Println("kinara: updateContainerImagePath ", LabelDockerImages, mounts)
+		fmt.Println("kinara: updateContainerImagePath2 ", getDockerImagePaths(context))
 		i.updateContainerImagesPath(LabelDockerImages, mounts, getDockerImagePaths(context))
 	}
 }
@@ -341,6 +350,7 @@ func (i *RealFsInfo) updateContainerImagesPath(label string, mounts []mount.Moun
 			major:      uint(useMount.Major),
 			minor:      uint(useMount.Minor),
 		}
+		fmt.Println("kinara: enter label entry! label source", label, useMount.Source)
 		i.labels[label] = useMount.Source
 	}
 }
@@ -372,6 +382,7 @@ func (i *RealFsInfo) GetMountpointForDevice(dev string) (string, error) {
 }
 
 func (i *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, error) {
+	fmt.Println("kinara: enter GetFsInfoForPath len partitions", len(i.partitions))
 	filesystems := make([]Fs, 0)
 	deviceSet := make(map[string]struct{})
 	diskStatsMap, err := getDiskStatsMap("/proc/diskstats")
@@ -434,6 +445,7 @@ func (i *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, error
 			}
 		}
 	}
+	fmt.Println("kinara: exit GetFsInfoForPath len filesystems", len(filesystems))
 	return filesystems, nil
 }
 

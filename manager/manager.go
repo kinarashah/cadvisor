@@ -167,6 +167,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig
 
 	context := fs.Context{}
 
+	fmt.Println("kinara: calling InitializeFSContext")
 	if err := container.InitializeFSContext(&context); err != nil {
 		return nil, err
 	}
@@ -271,10 +272,12 @@ type manager struct {
 func (m *manager) Start() error {
 	m.containerWatchers = container.InitializePlugins(m, m.fsInfo, m.includedMetrics)
 
+	fmt.Println("kinara: cadvisor after start initializePlugins", len(m.containerWatchers))
 	err := raw.Register(m, m.fsInfo, m.includedMetrics, m.rawContainerCgroupPathPrefixWhiteList)
 	if err != nil {
 		klog.Errorf("Registration of the raw container factory failed: %v", err)
 	}
+	fmt.Println("kinara: cadvisor after start register")
 
 	rawWatcher, err := raw.NewRawContainerWatcher()
 	if err != nil {
@@ -282,14 +285,18 @@ func (m *manager) Start() error {
 	}
 	m.containerWatchers = append(m.containerWatchers, rawWatcher)
 
+	fmt.Println("kinara: cadvisor after appending rawWatcher")
 	// Watch for OOMs.
 	err = m.watchForNewOoms()
 	if err != nil {
 		klog.Warningf("Could not configure a source for OOM detection, disabling OOM events: %v", err)
 	}
 
+	fmt.Println("kinara: cadvisor after watchForNewOoms ")
+
 	// If there are no factories, don't start any housekeeping and serve the information we do have.
 	if !container.HasFactories() {
+		fmt.Println("kinara: cadvisor return cuz container !HasFactories")
 		return nil
 	}
 
@@ -298,12 +305,12 @@ func (m *manager) Start() error {
 	if err != nil {
 		return err
 	}
-	klog.V(2).Infof("Starting recovery of all containers")
+	fmt.Println("kinara: cadvisor ", "Starting recovery of all containers")
 	err = m.detectSubcontainers("/")
 	if err != nil {
 		return err
 	}
-	klog.V(2).Infof("Recovery completed")
+	fmt.Println("kinara: cadvisor Recovery completed")
 
 	// Watch for new container.
 	quitWatcher := make(chan error)
@@ -768,19 +775,23 @@ func (m *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
 	// Get latest data from filesystems hanging off root container.
 	stats, err := m.memoryCache.RecentStats("/", empty, empty, 1)
 	if err != nil {
+		fmt.Println("kinara: err RecentStats ", err)
 		return nil, err
 	}
 	dev := ""
 	if len(label) != 0 {
 		dev, err = m.fsInfo.GetDeviceForLabel(label)
 		if err != nil {
+			fmt.Println("kinara: err GetDeviceForLabel ", err)
 			return nil, err
 		}
 	}
 	fsInfo := []v2.FsInfo{}
+	fmt.Println("kinara: len(stats)", len(stats))
 	for i := range stats[0].Filesystem {
 		fs := stats[0].Filesystem[i]
 		if len(label) != 0 && fs.Device != dev {
+			fmt.Println("kinara: continue fs.Device, dev ", fs.Device, dev)
 			continue
 		}
 		mountpoint, err := m.fsInfo.GetMountpointForDevice(fs.Device)
@@ -899,6 +910,7 @@ func (m *manager) createContainer(containerName string, watchSource watcher.Cont
 }
 
 func (m *manager) createContainerLocked(containerName string, watchSource watcher.ContainerWatchSource) error {
+	fmt.Println("kinara: cadvisor createContainerLocked", containerName)
 	namespacedName := namespacedContainerName{
 		Name: containerName,
 	}
@@ -914,7 +926,7 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 	}
 	if !accept {
 		// ignoring this container.
-		klog.V(4).Infof("ignoring container %q", containerName)
+		fmt.Println("kinara: cadvisor ignoring container %q", containerName)
 		return nil
 	}
 	collectorManager, err := collector.NewCollectorManager()
@@ -928,20 +940,22 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 		return err
 	}
 
+	fmt.Println("kinara: cadvisor after starting newContainerData")
+
 	if cgroups.IsCgroup2UnifiedMode() {
 		perfCgroupPath := path.Join(fs2.UnifiedMountpoint, containerName)
 		cont.perfCollector, err = m.perfManager.GetCollector(perfCgroupPath)
 		if err != nil {
-			klog.Errorf("Perf event metrics will not be available for container %q: %v", containerName, err)
+			fmt.Println("kinara: Perf event metrics will not be available for container ", containerName, err)
 		}
 	} else {
 		devicesCgroupPath, err := handler.GetCgroupPath("devices")
 		if err != nil {
-			klog.Warningf("Error getting devices cgroup path: %v", err)
+			fmt.Println("kinara:", "Error getting devices cgroup path: %v", err)
 		} else {
 			cont.nvidiaCollector, err = m.nvidiaManager.GetCollector(devicesCgroupPath)
 			if err != nil {
-				klog.V(4).Infof("GPU metrics may be unavailable/incomplete for container %s: %s", cont.info.Name, err)
+				fmt.Println("kinara:", "GPU metrics may be unavailable/incomplete for container %s: %s", cont.info.Name, err)
 			}
 		}
 		perfCgroupPath, err := handler.GetCgroupPath("perf_event")

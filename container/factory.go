@@ -21,7 +21,6 @@ import (
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/watcher"
-
 	"k8s.io/klog/v2"
 )
 
@@ -134,7 +133,7 @@ func RegisterPlugin(name string, plugin Plugin) error {
 	if _, found := plugins[name]; found {
 		return fmt.Errorf("Plugin %q was registered twice", name)
 	}
-	klog.V(4).Infof("Registered Plugin %q", name)
+	fmt.Println("kinara: registered Plugin", name)
 	plugins[name] = plugin
 	return nil
 }
@@ -142,6 +141,7 @@ func RegisterPlugin(name string, plugin Plugin) error {
 func InitializeFSContext(context *fs.Context) error {
 	pluginsLock.Lock()
 	defer pluginsLock.Unlock()
+	fmt.Println("kinara: plugins", plugins)
 	for name, plugin := range plugins {
 		err := plugin.InitializeFSContext(context)
 		if err != nil {

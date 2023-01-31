@@ -15,6 +15,7 @@
 package docker
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/cadvisor/container"
@@ -22,7 +23,6 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/watcher"
 	"golang.org/x/net/context"
-	"k8s.io/klog/v2"
 )
 
 const dockerClientTimeout = 10 * time.Second
@@ -43,6 +43,7 @@ func (p *plugin) InitializeFSContext(context *fs.Context) error {
 		Driver:       dockerStatus.Driver,
 		DriverStatus: dockerStatus.DriverStatus,
 	}
+	fmt.Println("kinara: docker root driver driverStatus", context.Docker.Root, context.Docker.Driver, context.Docker.DriverStatus)
 	return nil
 }
 
@@ -63,9 +64,9 @@ func retryDockerStatus() info.DockerStatus {
 
 		switch err {
 		case context.DeadlineExceeded:
-			klog.Warningf("Timeout trying to communicate with docker during initialization, will retry")
+			fmt.Println("kinara: Timeout trying to communicate with docker during initialization, will retry")
 		default:
-			klog.V(5).Infof("Docker not connected: %v", err)
+			fmt.Println("kinara: docker not connected:", err)
 			return info.DockerStatus{}
 		}
 
